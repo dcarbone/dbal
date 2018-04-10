@@ -21,6 +21,9 @@ namespace Doctrine\DBAL\Platforms;
 
 use Doctrine\DBAL\DBALException;
 use Doctrine\DBAL\Exception\InvalidArgumentException;
+use Doctrine\DBAL\Schema\Constraint;
+use Doctrine\DBAL\Schema\ForeignKeyConstraint;
+use Doctrine\DBAL\Schema\Index;
 use Doctrine\DBAL\Schema\Table;
 
 /**
@@ -175,22 +178,6 @@ class CouchbaseN1QLPlatform extends AbstractPlatform
     /**
      * @inheritDoc
      */
-    public function getBitAndComparisonExpression($value1, $value2)
-    {
-        return "BITAND({$value1}, {$value2})";
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function getBitOrComparisonExpression($value1, $value2)
-    {
-        return "BITOR({$value1}, {$value2})";
-    }
-
-    /**
-     * @inheritDoc
-     */
     protected function getDateArithmeticIntervalExpression($date, $operator, $interval, $unit)
     {
         if (is_int($date) || (is_string($date) && ctype_digit($date))) {
@@ -206,6 +193,22 @@ class CouchbaseN1QLPlatform extends AbstractPlatform
         }
 
         return ",{$op}" . strtolower($unit) . ')';
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function getBitAndComparisonExpression($value1, $value2)
+    {
+        return "BITAND({$value1}, {$value2})";
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function getBitOrComparisonExpression($value1, $value2)
+    {
+        return "BITOR({$value1}, {$value2})";
     }
 
     /**
@@ -276,16 +279,12 @@ class CouchbaseN1QLPlatform extends AbstractPlatform
      * @inheritDoc
      * @throws InvalidArgumentException
      */
-    public function getDropIndexSQL($index, $table = null, $useGSI = false)
+    public function getDropIndexSQL($index, $bucket = null)
     {
-        if ('' === (string)$table) {
-            throw new InvalidArgumentException('$table argument is required with ' . __CLASS__);
+        if ('' === (string)$bucket) {
+            throw new InvalidArgumentException('$bucket argument is required with ' . __CLASS__);
         }
-        $sql = "DROP INDEX {$table}.{$index}";
-        if ($useGSI) {
-            return "{$sql} USING GSI";
-        }
-        return $sql;
+        return "DROP INDEX {$bucket}.{$index}";
     }
 
     /**
@@ -321,6 +320,183 @@ class CouchbaseN1QLPlatform extends AbstractPlatform
     public function getCommentOnColumnSQL($tableName, $columnName, $comment)
     {
         throw DBALException::notSupported(__METHOD__);
+    }
+
+    /**
+     * @inheritDoc
+     * @throws DBALException
+     */
+    public function getCreateTemporaryTableSnippetSQL()
+    {
+        throw DBALException::notSupported(__METHOD__);
+    }
+
+    /**
+     * @inheritDoc
+     * @throws DBALException
+     */
+    public function getCreateConstraintSQL(Constraint $constraint, $table)
+    {
+        throw DBALException::notSupported(__METHOD__);
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function getCreateIndexSQL(Index $index, $table)
+    {
+        // TODO: Implement more index options
+
+        if ($table instanceof Table) {
+            $table = $table->getQuotedName($this);
+        }
+
+        $name = $index->getQuotedName($this);
+        $columns = $index->getQuotedColumns($this);
+
+        if ($index->isPrimary()) {
+            if (0 < count($columns)) {
+                throw new \LogicException('Cannot specify columns to create Primary index with');
+            }
+            return "CREATE PRIMARY INDEX {$name} ON {$table}";
+        }
+
+        if (count($columns) == 0) {
+            throw new \InvalidArgumentException("Incomplete definition. 'columns' required.");
+        }
+
+        return sprintf(
+            'CREATE INDEX %s ON %s (%s)%s',
+            $name,
+            $table,
+            $this->getIndexFieldDeclarationListSQL($columns),
+            $this->getPartialIndexSQL($index)
+        );
+    }
+
+    /**
+     * @inheritDoc
+     */
+    protected function getCreateIndexSQLFlags(Index $index)
+    {
+        // TODO: support available flags
+        DBALException::notSupported(__METHOD__);
+    }
+
+    /**
+     * @inheritDoc
+     * @throws DBALException
+     */
+    public function getCreatePrimaryKeySQL(Index $index, $table)
+    {
+        throw DBALException::notSupported(__METHOD__);
+    }
+
+    /**
+     * @inheritDoc
+     * @throws DBALException
+     */
+    public function getCreateForeignKeySQL(ForeignKeyConstraint $foreignKey, $table)
+    {
+        throw DBALException::notSupported(__METHOD__);
+    }
+
+    /**
+     * @inheritDoc
+     * @throws DBALException
+     */
+    public function getColumnDeclarationListSQL(array $fields)
+    {
+        throw DBALException::notSupported(__METHOD__);
+    }
+
+    /**
+     * @inheritDoc
+     * @throws DBALException
+     */
+    public function getColumnDeclarationSQL($name, array $field)
+    {
+        throw DBALException::notSupported(__METHOD__);
+    }
+
+    /**
+     * @inheritDoc
+     * @throws DBALException
+     */
+    public function getDecimalTypeDeclarationSQL(array $columnDef)
+    {
+        throw DBALException::notSupported(__METHOD__);
+    }
+
+    /**
+     * @inheritDoc
+     * @throws DBALException
+     */
+    public function getDefaultValueDeclarationSQL($field)
+    {
+        throw DBALException::notSupported(__METHOD__);
+    }
+
+    /**
+     * @inheritDoc
+     * @throws DBALException
+     */
+    public function getVarcharTypeDeclarationSQL(array $field)
+    {
+        throw DBALException::notSupported(__METHOD__);
+    }
+
+    /**
+     * @inheritDoc
+     * @throws DBALException
+     */
+    public function getBinaryTypeDeclarationSQL(array $field)
+    {
+        throw DBALException::notSupported(__METHOD__);
+    }
+
+    /**
+     * @inheritDoc
+     * @throws DBALException
+     */
+    public function getGuidTypeDeclarationSQL(array $field)
+    {
+        throw DBALException::notSupported(__METHOD__);
+    }
+
+    /**
+     * @inheritDoc
+     * @throws DBALException
+     */
+    public function getJsonTypeDeclarationSQL(array $field)
+    {
+        throw DBALException::notSupported(__METHOD__);
+    }
+
+    /**
+     * @inheritDoc
+     * @throws DBALException
+     */
+    public function getCheckDeclarationSQL(array $definition)
+    {
+        throw DBALException::notSupported(__METHOD__);
+    }
+
+    /**
+     * @inheritDoc
+     * @throws DBALException
+     */
+    public function getUniqueConstraintDeclarationSQL($name, Index $index)
+    {
+        throw DBALException::notSupported(__METHOD__);
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function supportsPartialIndexes()
+    {
+        return true;
     }
 
     /**
@@ -457,66 +633,74 @@ class CouchbaseN1QLPlatform extends AbstractPlatform
 
     /**
      * @inheritDoc
+     * @throws DBALException
      */
     public function getBooleanTypeDeclarationSQL(array $columnDef)
     {
-        return '';
+        throw DBALException::notSupported(__METHOD__);
     }
 
     /**
      * @inheritDoc
+     * @throws DBALException
      */
     public function getIntegerTypeDeclarationSQL(array $columnDef)
     {
-        return '';
+        throw DBALException::notSupported(__METHOD__);
     }
 
     /**
      * @inheritDoc
+     * @throws DBALException
      */
     public function getBigIntTypeDeclarationSQL(array $columnDef)
     {
-        return '';
+        throw DBALException::notSupported(__METHOD__);
     }
 
     /**
      * @inheritDoc
+     * @throws DBALException
      */
     public function getSmallIntTypeDeclarationSQL(array $columnDef)
     {
-        return '';
+        throw DBALException::notSupported(__METHOD__);
     }
 
     /**
      * @inheritDoc
+     * @throws DBALException
      */
     protected function _getCommonIntegerTypeDeclarationSQL(array $columnDef)
     {
-        return '';
+        throw DBALException::notSupported(__METHOD__);
     }
 
     /**
      * @inheritDoc
+     * @throws DBALException
      */
     protected function initializeDoctrineTypeMappings()
     {
-        return '';
+        throw DBALException::notSupported(__METHOD__);
     }
 
     /**
      * @inheritDoc
+     * @throws DBALException
      */
     public function getClobTypeDeclarationSQL(array $field)
     {
-        return '';
+        throw DBALException::notSupported(__METHOD__);
     }
 
     /**
      * @inheritDoc
+     * @throws DBALException
      */
     public function getBlobTypeDeclarationSQL(array $field)
     {
-        return '';
+        throw DBALException::notSupported(__METHOD__);
     }
 
     /**
